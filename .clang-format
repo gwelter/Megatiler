@@ -1,0 +1,12 @@
+BasedOnStyle: Google
+ColumnLimit: 120
+BreakArrays: true
+AlignArrayOfStructures: Right
+LineEnding: LF
+IndentWidth: 4
+BinPackParameters: false
+BinPackArguments: false
+AllowAllParametersOfDeclarationOnNextLine: false
+AllowAllArgumentsOnNextLine: false
+AlignAfterOpenBracket: AlwaysBreak
+PointerAlignment: Right

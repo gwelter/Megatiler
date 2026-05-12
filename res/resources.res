@@ -1,0 +1,1 @@
+IMAGE floortiles "tilesheet.png" 0
