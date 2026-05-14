@@ -4,5 +4,6 @@
 #define _RES_RESOURCES_H_
 
 extern const Image floortiles;
+extern const SpriteDefinition spr_player;
 
 #endif // _RES_RESOURCES_H_
