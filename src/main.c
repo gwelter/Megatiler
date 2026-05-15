@@ -11,6 +11,8 @@
 #define MAP_WIDTH 8
 #define MAP_HEIGHT 8
 
+#define SOLID_TILE 1
+
 typedef enum {
     MOVE_DIRECTION_UP,
     MOVE_DIRECTION_DOWN,
@@ -83,17 +85,101 @@ void loadLevel() {
     }
 }
 
+int get_tile_at(u8 x, u8 y) {
+    // return *(&level1[0][0] + (Y * MAP_WIDTH + X));
+    return level1[y][x];
+}
+
+void move_player(MoveDirection direction) {
+    if (!player.moving) {
+        switch (direction) {
+            case MOVE_DIRECTION_UP:
+                if (player.tile_pos.y > 0 && get_tile_at(player.tile_pos.x, player.tile_pos.y - 1) != SOLID_TILE) {
+                    player.tile_pos.y -= 1;
+                    player.moving = TRUE;
+                    player.dir = direction;
+                }
+                break;
+            case MOVE_DIRECTION_DOWN:
+                if (player.tile_pos.y < MAP_HEIGHT &&
+                    get_tile_at(player.tile_pos.x, player.tile_pos.y + 1) != SOLID_TILE) {
+                    player.tile_pos.y += 1;
+                    player.moving = TRUE;
+                    player.dir = direction;
+                }
+                break;
+            case MOVE_DIRECTION_LEFT:
+                if (player.tile_pos.x > 0 && get_tile_at(player.tile_pos.x - 1, player.tile_pos.y) != SOLID_TILE) {
+                    player.tile_pos.x -= 1;
+                    player.moving = TRUE;
+                    player.dir = direction;
+                }
+                break;
+            case MOVE_DIRECTION_RIGHT:
+                if (player.tile_pos.x < MAP_WIDTH &&
+                    get_tile_at(player.tile_pos.x + 1, player.tile_pos.y) != SOLID_TILE) {
+                    player.tile_pos.x += 1;
+                    player.moving = TRUE;
+                    player.dir = direction;
+                }
+                break;
+
+            default:
+                break;
+        }
+    }
+}
+
+void myJoyHandler(u16 joy, u16 change, u16 state) {
+    if (joy == JOY_1) {
+        if (state & BUTTON_UP) {
+            move_player(MOVE_DIRECTION_UP);
+        } else if (state & BUTTON_DOWN) {
+            move_player(MOVE_DIRECTION_DOWN);
+        } else if (state & BUTTON_LEFT) {
+            move_player(MOVE_DIRECTION_LEFT);
+        } else if (state & BUTTON_RIGHT) {
+            move_player(MOVE_DIRECTION_RIGHT);
+        }
+    }
+}
+
 int main() {
     VDP_loadTileSet(floortiles.tileset, 1, DMA);
     PAL_setPalette(PAL1, floortiles.palette->data, DMA);
     PAL_setPalette(PAL2, spr_player.palette->data, DMA);
 
+    JOY_init();
+    JOY_setEventHandler(&myJoyHandler);
+
     loadLevel();
 
     VDP_drawText("Hello Sega!!", 10, 13);
     while (1) {
-        // For versions prior to SGDK 1.60 use VDP_waitVSync instead.
+        if (player.moving) {
+            switch (player.dir) {
+                case MOVE_DIRECTION_UP:
+                    player.pos.y -= 1;
+                    break;
+                case MOVE_DIRECTION_DOWN:
+                    player.pos.y += 1;
+                    break;
+                case MOVE_DIRECTION_LEFT:
+                    player.pos.x -= 1;
+                    break;
+                case MOVE_DIRECTION_RIGHT:
+                    player.pos.x += 1;
+                    break;
+
+                default:
+                    break;
+            }
+        }
+        if (player.pos.x % TILESIZE == 0 && player.pos.y % TILESIZE == 0) {
+            player.moving = FALSE;
+        }
         SPR_update();
+        SPR_setPosition(player.sprite, player.pos.x, player.pos.y);
         SYS_doVBlankProcess();
     }
     return (0);
