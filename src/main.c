@@ -11,6 +11,10 @@
 #define MAP_WIDTH 8
 #define MAP_HEIGHT 8
 
+#define ANIM_DOWN 0
+#define ANIM_UP 1
+#define ANIM_SIDE 2
+
 #define SOLID_TILE 1
 
 typedef enum {
@@ -156,19 +160,40 @@ int main() {
 
     VDP_drawText("Hello Sega!!", 10, 13);
     while (1) {
+        /**
+         * For continuous movement.
+         * Don't use myJoyHandler in case.
+         */
+        // u16 joy = JOY_readJoypad(JOY_1);
+        // if (joy & BUTTON_UP) {
+        //     move_player(MOVE_DIRECTION_UP);
+        // } else if (joy & BUTTON_DOWN) {
+        //     move_player(MOVE_DIRECTION_DOWN);
+        // } else if (joy & BUTTON_LEFT) {
+        //     move_player(MOVE_DIRECTION_LEFT);
+        // } else if (joy & BUTTON_RIGHT) {
+        //     move_player(MOVE_DIRECTION_RIGHT);
+        // }
+
         if (player.moving) {
             switch (player.dir) {
                 case MOVE_DIRECTION_UP:
                     player.pos.y -= 1;
+                    SPR_setAnim(player.sprite, ANIM_UP);
                     break;
                 case MOVE_DIRECTION_DOWN:
                     player.pos.y += 1;
+                    SPR_setAnim(player.sprite, ANIM_DOWN);
                     break;
                 case MOVE_DIRECTION_LEFT:
                     player.pos.x -= 1;
+                    SPR_setAnim(player.sprite, ANIM_SIDE);
+                    SPR_setHFlip(player.sprite, TRUE);
                     break;
                 case MOVE_DIRECTION_RIGHT:
                     player.pos.x += 1;
+                    SPR_setAnim(player.sprite, ANIM_SIDE);
+                    SPR_setHFlip(player.sprite, FALSE);
                     break;
 
                 default:
