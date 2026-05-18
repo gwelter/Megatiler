@@ -22,11 +22,14 @@
 #define COIN_TILE 6
 #define EXIT_TILE 5
 
+#define LEVEL_NUM 3
 #define MAX_COINS 3
 
 u8 coins_collected = 0;
 char hud_string[10] = "";
 bool exit_unlocked = FALSE;
+
+typedef u8 map[MAP_HEIGHT][MAP_WIDTH];
 
 typedef enum {
     MOVE_DIRECTION_UP,
@@ -61,7 +64,7 @@ typedef struct {
     u8 health;
 } Coin;
 
-u8 level1[MAP_HEIGHT][MAP_WIDTH] = {
+map level1 = {
     {0, 0, 0, 0, 0, 0, 0, 0},
     {0, 4, 0, 0, 0, 0, 6, 0},
     {0, 0, 0, 0, 1, 0, 6, 0},
@@ -70,6 +73,28 @@ u8 level1[MAP_HEIGHT][MAP_WIDTH] = {
     {0, 0, 0, 0, 1, 0, 0, 0},
     {0, 0, 6, 0, 1, 0, 6, 0},
     {0, 0, 0, 0, 0, 0, 0, 5}
+};
+
+map level2 = {
+    {0, 0, 0, 6, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 4, 0, 1, 1, 1, 0, 0},
+    {0, 0, 0, 6, 0, 1, 0, 0},
+    {0, 0, 0, 1, 1, 1, 6, 0},
+    {0, 0, 0, 1, 0, 0, 0, 0},
+    {0, 0, 0, 1, 1, 1, 5, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0}
+};
+
+map level3 = {
+    {0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 1, 1, 1, 1, 0, 0},
+    {0, 0, 0, 0, 6, 1, 0, 0},
+    {0, 0, 0, 1, 1, 1, 6, 0},
+    {0, 0, 0, 0, 0, 1, 0, 0},
+    {0, 6, 1, 1, 1, 1, 0, 0},
+    {0, 4, 0, 0, 0, 0, 5, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0}
 };
 
 Entity player = {
@@ -86,6 +111,10 @@ Entity player = {
 Coin coins[MAX_COINS];
 Point exit_location = {.x = 0, .y = 0};
 
+u8 *current_level;
+static u8 current_level_index = 0;
+map *level_list[LEVEL_NUM] = {&level1, &level2, &level3};
+
 void update_score_display() {
     sprintf(hud_string, "SCORE: %d\n", coins_collected);
     VDP_clearText(MAP_WIDTH, 0, 10);
@@ -98,7 +127,20 @@ void unlock_exit() {
     XGM_startPlayPCM(SFX_UNLOCK, 1, SOUND_PCM_CH2);
 }
 
-void loadLevel() {
+void clear_level() {
+    VDP_clearPlane(BG_B, TRUE);
+    VDP_clearSprites();
+    coins_collected = 0;
+    update_score_display();
+    exit_unlocked = FALSE;
+}
+
+void load_level() {
+    clear_level();
+    current_level = level_list[current_level_index];
+
+    u8 i = 0;
+    u8 total = MAP_HEIGHT * MAP_WIDTH;
     u8 x = 0;
     u8 y = 0;
     u8 t = 0;
@@ -106,44 +148,43 @@ void loadLevel() {
     Coin *c = coins;
 
     SPR_init();
-    for (y = 0; y < MAP_HEIGHT; y++) {
-        for (x = 0; x < MAP_WIDTH; x++) {
-            t = level1[y][x];
-            if (t == SPAWN_TILE) {
-                player.tile_pos.x = x;
-                player.tile_pos.y = y;
-                player.pos.x = player.tile_pos.x * TILESIZE;
-                player.pos.y = player.tile_pos.y * TILESIZE;
-                player.sprite =
-                    SPR_addSprite(&spr_player, player.pos.x, player.pos.y, TILE_ATTR(PAL2, 0, FALSE, FALSE));
-                VDP_setTileMapXY(BG_B, TILE_ATTR_FULL(PAL1, 0, FALSE, FALSE, 1), x, y);
-            } else if (t == COIN_TILE) {
-                if (coin_num < MAX_COINS) {
-                    c = &coins[coin_num];
-                    c->pos.x = x * TILESIZE;
-                    c->pos.y = y * TILESIZE;
-                    c->w = 8;
-                    c->h = 8;
-                    c->health = 1;
-                    c->sprite = SPR_addSprite(&spr_coin, c->pos.x, c->pos.y, TILE_ATTR(PAL2, 0, FALSE, FALSE));
-                    coin_num++;
-                }
-                VDP_setTileMapXY(BG_B, TILE_ATTR_FULL(PAL1, 0, FALSE, FALSE, 1), x, y);
-            } else if (t == EXIT_TILE) {
-                exit_location.x = x;
-                exit_location.y = y;
-                VDP_setTileMapXY(BG_B, TILE_ATTR_FULL(PAL1, 0, FALSE, FALSE, 1), x, y);
-            } else {
-                VDP_setTileMapXY(BG_B, TILE_ATTR_FULL(PAL1, 0, FALSE, FALSE, t + 1), x, y);
+    for (i = 0; i < total; i++) {
+        t = *(current_level + i);
+        if (t == SPAWN_TILE) {
+            player.tile_pos.x = x;
+            player.tile_pos.y = y;
+            player.pos.x = player.tile_pos.x * TILESIZE;
+            player.pos.y = player.tile_pos.y * TILESIZE;
+            player.sprite = SPR_addSprite(&spr_player, player.pos.x, player.pos.y, TILE_ATTR(PAL2, 0, FALSE, FALSE));
+            VDP_setTileMapXY(BG_B, TILE_ATTR_FULL(PAL1, 0, FALSE, FALSE, 1), x, y);
+        } else if (t == COIN_TILE) {
+            if (coin_num < MAX_COINS) {
+                c = &coins[coin_num];
+                c->pos.x = x * TILESIZE;
+                c->pos.y = y * TILESIZE;
+                c->w = 8;
+                c->h = 8;
+                c->health = 1;
+                c->sprite = SPR_addSprite(&spr_coin, c->pos.x, c->pos.y, TILE_ATTR(PAL2, 0, FALSE, FALSE));
+                coin_num++;
             }
+            VDP_setTileMapXY(BG_B, TILE_ATTR_FULL(PAL1, 0, FALSE, FALSE, 1), x, y);
+        } else if (t == EXIT_TILE) {
+            exit_location.x = x;
+            exit_location.y = y;
+            VDP_setTileMapXY(BG_B, TILE_ATTR_FULL(PAL1, 0, FALSE, FALSE, 1), x, y);
+        } else {
+            VDP_setTileMapXY(BG_B, TILE_ATTR_FULL(PAL1, 0, FALSE, FALSE, t + 1), x, y);
+        }
+        x++;
+        if (x >= MAP_WIDTH) {
+            y++;
+            x = 0;
         }
     }
 }
 
-int get_tile_at(u8 x, u8 y) {
-    // return *(&level1[0][0] + (Y * MAP_WIDTH + X));
-    return level1[y][x];
-}
+int get_tile_at(u8 x, u8 y) { return *(current_level + (y * MAP_WIDTH + x)); }
 
 void move_player(MoveDirection direction) {
     if (!player.moving) {
@@ -210,7 +251,7 @@ int main() {
     JOY_init();
     JOY_setEventHandler(&myJoyHandler);
 
-    loadLevel();
+    load_level();
     update_score_display();
 
     Coin *coin_to_check;
