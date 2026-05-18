@@ -20,11 +20,13 @@
 
 #define SOLID_TILE 1
 #define COIN_TILE 6
+#define EXIT_TILE 5
 
 #define MAX_COINS 3
 
 u8 coins_collected = 0;
 char hud_string[10] = "";
+bool exit_unlocked = FALSE;
 
 typedef enum {
     MOVE_DIRECTION_UP,
@@ -67,7 +69,7 @@ u8 level1[MAP_HEIGHT][MAP_WIDTH] = {
     {0, 0, 0, 0, 1, 0, 0, 0},
     {0, 0, 0, 0, 1, 0, 0, 0},
     {0, 0, 6, 0, 1, 0, 6, 0},
-    {0, 0, 0, 0, 0, 0, 0, 0}
+    {0, 0, 0, 0, 0, 0, 0, 5}
 };
 
 Entity player = {
@@ -82,11 +84,18 @@ Entity player = {
     "PLAYER",
 };
 Coin coins[MAX_COINS];
+Point exit_location = {.x = 0, .y = 0};
 
 void update_score_display() {
     sprintf(hud_string, "SCORE: %d\n", coins_collected);
     VDP_clearText(MAP_WIDTH, 0, 10);
     VDP_drawText(hud_string, MAP_WIDTH, 0);
+}
+
+void unlock_exit() {
+    exit_unlocked = TRUE;
+    VDP_setTileMapXY(BG_B, TILE_ATTR_FULL(PAL1, 0, FALSE, FALSE, 3), exit_location.x, exit_location.y);
+    XGM_startPlayPCM(SFX_UNLOCK, 1, SOUND_PCM_CH2);
 }
 
 void loadLevel() {
@@ -120,6 +129,10 @@ void loadLevel() {
                     coin_num++;
                 }
                 VDP_setTileMapXY(BG_B, TILE_ATTR_FULL(PAL1, 0, FALSE, FALSE, 1), x, y);
+            } else if (t == EXIT_TILE) {
+                exit_location.x = x;
+                exit_location.y = y;
+                VDP_setTileMapXY(BG_B, TILE_ATTR_FULL(PAL1, 0, FALSE, FALSE, 1), x, y);
             } else {
                 VDP_setTileMapXY(BG_B, TILE_ATTR_FULL(PAL1, 0, FALSE, FALSE, t + 1), x, y);
             }
@@ -143,7 +156,7 @@ void move_player(MoveDirection direction) {
                 }
                 break;
             case MOVE_DIRECTION_DOWN:
-                if (player.tile_pos.y < MAP_HEIGHT &&
+                if (player.tile_pos.y < MAP_HEIGHT - 1 &&
                     get_tile_at(player.tile_pos.x, player.tile_pos.y + 1) != SOLID_TILE) {
                     player.tile_pos.y += 1;
                     player.moving = TRUE;
@@ -158,7 +171,7 @@ void move_player(MoveDirection direction) {
                 }
                 break;
             case MOVE_DIRECTION_RIGHT:
-                if (player.tile_pos.x < MAP_WIDTH &&
+                if (player.tile_pos.x < MAP_WIDTH - 1 &&
                     get_tile_at(player.tile_pos.x + 1, player.tile_pos.y) != SOLID_TILE) {
                     player.tile_pos.x += 1;
                     player.moving = TRUE;
@@ -244,6 +257,9 @@ int main() {
         }
         if (player.pos.x % TILESIZE == 0 && player.pos.y % TILESIZE == 0) {
             player.moving = FALSE;
+            if (exit_unlocked && player.tile_pos.x == exit_location.x && player.tile_pos.y == exit_location.y) {
+                // TODO: Go to next level
+            }
         }
         u8 i = 0;
         for (i = 0; i < MAX_COINS; i++) {
@@ -258,6 +274,10 @@ int main() {
                     XGM_startPlayPCM(SFX_COIN, 1, SOUND_PCM_CH2);
                     coins_collected++;
                     update_score_display();
+
+                    if (coins_collected == MAX_COINS) {
+                        unlock_exit();
+                    }
                 }
             }
         }
