@@ -6,6 +6,9 @@
 #include <genesis.h>
 #include <resources.h>
 
+#define SFX_COIN 64
+#define SFX_UNLOCK 65
+
 #define SPAWN_TILE 4
 #define TILESIZE 8
 #define MAP_WIDTH 8
@@ -16,6 +19,12 @@
 #define ANIM_SIDE 2
 
 #define SOLID_TILE 1
+#define COIN_TILE 6
+
+#define MAX_COINS 3
+
+u8 coins_collected = 0;
+char hud_string[10] = "";
 
 typedef enum {
     MOVE_DIRECTION_UP,
@@ -42,14 +51,22 @@ typedef struct {
     char name[6];
 } Entity;
 
-u8 level1[8][8] = {
+typedef struct {
+    Point pos;
+    u8 w;
+    u8 h;
+    Sprite *sprite;
+    u8 health;
+} Coin;
+
+u8 level1[MAP_HEIGHT][MAP_WIDTH] = {
     {0, 0, 0, 0, 0, 0, 0, 0},
-    {0, 4, 0, 0, 0, 0, 0, 0},
+    {0, 4, 0, 0, 0, 0, 6, 0},
+    {0, 0, 0, 0, 1, 0, 6, 0},
+    {0, 0, 0, 1, 1, 0, 6, 0},
     {0, 0, 0, 0, 1, 0, 0, 0},
-    {0, 0, 0, 1, 1, 0, 0, 0},
     {0, 0, 0, 0, 1, 0, 0, 0},
-    {0, 0, 0, 0, 1, 0, 0, 0},
-    {0, 0, 0, 0, 1, 0, 0, 0},
+    {0, 0, 6, 0, 1, 0, 6, 0},
     {0, 0, 0, 0, 0, 0, 0, 0}
 };
 
@@ -64,15 +81,24 @@ Entity player = {
     NULL,
     "PLAYER",
 };
+Coin coins[MAX_COINS];
+
+void update_score_display() {
+    sprintf(hud_string, "SCORE: %d\n", coins_collected);
+    VDP_clearText(MAP_WIDTH, 0, 10);
+    VDP_drawText(hud_string, MAP_WIDTH, 0);
+}
 
 void loadLevel() {
     u8 x = 0;
     u8 y = 0;
     u8 t = 0;
+    u8 coin_num = 0;
+    Coin *c = coins;
 
     SPR_init();
-    for (y = 0; y < 8; y++) {
-        for (x = 0; x < 8; x++) {
+    for (y = 0; y < MAP_HEIGHT; y++) {
+        for (x = 0; x < MAP_WIDTH; x++) {
             t = level1[y][x];
             if (t == SPAWN_TILE) {
                 player.tile_pos.x = x;
@@ -81,6 +107,18 @@ void loadLevel() {
                 player.pos.y = player.tile_pos.y * TILESIZE;
                 player.sprite =
                     SPR_addSprite(&spr_player, player.pos.x, player.pos.y, TILE_ATTR(PAL2, 0, FALSE, FALSE));
+                VDP_setTileMapXY(BG_B, TILE_ATTR_FULL(PAL1, 0, FALSE, FALSE, 1), x, y);
+            } else if (t == COIN_TILE) {
+                if (coin_num < MAX_COINS) {
+                    c = &coins[coin_num];
+                    c->pos.x = x * TILESIZE;
+                    c->pos.y = y * TILESIZE;
+                    c->w = 8;
+                    c->h = 8;
+                    c->health = 1;
+                    c->sprite = SPR_addSprite(&spr_coin, c->pos.x, c->pos.y, TILE_ATTR(PAL2, 0, FALSE, FALSE));
+                    coin_num++;
+                }
                 VDP_setTileMapXY(BG_B, TILE_ATTR_FULL(PAL1, 0, FALSE, FALSE, 1), x, y);
             } else {
                 VDP_setTileMapXY(BG_B, TILE_ATTR_FULL(PAL1, 0, FALSE, FALSE, t + 1), x, y);
@@ -149,6 +187,9 @@ void myJoyHandler(u16 joy, u16 change, u16 state) {
 }
 
 int main() {
+    XGM_setPCM(SFX_COIN, sfx_coin, sizeof(sfx_coin));
+    XGM_setPCM(SFX_UNLOCK, sfx_unlock, sizeof(sfx_coin));
+
     VDP_loadTileSet(floortiles.tileset, 1, DMA);
     PAL_setPalette(PAL1, floortiles.palette->data, DMA);
     PAL_setPalette(PAL2, spr_player.palette->data, DMA);
@@ -157,8 +198,9 @@ int main() {
     JOY_setEventHandler(&myJoyHandler);
 
     loadLevel();
+    update_score_display();
 
-    VDP_drawText("Hello Sega!!", 10, 13);
+    Coin *coin_to_check;
     while (1) {
         /**
          * For continuous movement.
@@ -202,6 +244,22 @@ int main() {
         }
         if (player.pos.x % TILESIZE == 0 && player.pos.y % TILESIZE == 0) {
             player.moving = FALSE;
+        }
+        u8 i = 0;
+        for (i = 0; i < MAX_COINS; i++) {
+            coin_to_check = &coins[i];
+            if (player.pos.x < coin_to_check->pos.x + coin_to_check->w &&
+                player.pos.x + player.w > coin_to_check->pos.x &&
+                player.pos.y < coin_to_check->pos.y + coin_to_check->h &&
+                player.pos.y + player.h > coin_to_check->pos.y) {
+                if (coin_to_check->health > 0) {
+                    coin_to_check->health = 0;
+                    SPR_setVisibility(coin_to_check->sprite, HIDDEN);
+                    XGM_startPlayPCM(SFX_COIN, 1, SOUND_PCM_CH2);
+                    coins_collected++;
+                    update_score_display();
+                }
+            }
         }
         SPR_update();
         SPR_setPosition(player.sprite, player.pos.x, player.pos.y);
