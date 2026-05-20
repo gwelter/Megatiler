@@ -137,7 +137,7 @@ void clear_level() {
 
 void load_level() {
     clear_level();
-    current_level = level_list[current_level_index];
+    current_level = (u8 *)level_list[current_level_index];
 
     u8 i = 0;
     u8 total = MAP_HEIGHT * MAP_WIDTH;
