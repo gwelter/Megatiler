@@ -149,7 +149,7 @@ void load_level() {
 
     SPR_init();
     for (i = 0; i < total; i++) {
-        t = *(current_level + i);
+        t = current_level[i];
         if (t == SPAWN_TILE) {
             player.tile_pos.x = x;
             player.tile_pos.y = y;
@@ -299,7 +299,11 @@ int main() {
         if (player.pos.x % TILESIZE == 0 && player.pos.y % TILESIZE == 0) {
             player.moving = FALSE;
             if (exit_unlocked && player.tile_pos.x == exit_location.x && player.tile_pos.y == exit_location.y) {
-                // TODO: Go to next level
+                current_level_index++;
+                if (current_level_index >= LEVEL_NUM) {
+                    current_level_index = 0;
+                }
+                load_level();
             }
         }
         u8 i = 0;
